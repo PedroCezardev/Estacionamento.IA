@@ -1,6 +1,7 @@
 import cv2
 import alternativePredictions
 import plotarVagas
+import arduinoConective
 
 def is_car_in_parking_space(car_rect, space_rect):
     (xA, yA, wA, hA) = car_rect
@@ -14,7 +15,7 @@ def is_car_in_parking_space(car_rect, space_rect):
 # Função para analisar as predições e as vagas
 def predictions_analyze():
     # Carregar e processar a imagem
-    frame = cv2.imread("../assets/inputs/image03.jpeg")
+    frame = cv2.imread("../assets/inputs/imagemAtual1.jpeg")
     predictions = alternativePredictions.predict_image(frame)
     frame_ploted = alternativePredictions.plot_predictions(frame, predictions)
     coordinate_vagas = plotarVagas.coordinate_vagas()
@@ -28,6 +29,8 @@ def predictions_analyze():
 
     # Atualizar a imagem com as vagas e carros detectados
     frame_with_vagas = plotarVagas.plot_vagas(frame_ploted, coordinate_vagas, car_coordinates)
+     # Enviar os valores das vagas para o Arduino
+    arduinoConective.toSendValuesVaga(coordinate_vagas, car_coordinates)
 
     # Exibir a imagem com as predições e as vagas
     cv2.imshow("Previsoes com Estacionamento com Vagas", frame_with_vagas)

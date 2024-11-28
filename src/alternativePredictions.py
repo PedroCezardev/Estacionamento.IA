@@ -33,7 +33,7 @@ CLASS_NAME = "Carro"
 model = YOLO("../assets/models/yolov8s.pt")
 
 # Carregar a imagem
-frame = cv2.imread("../assets/inputs/image03.jpeg")
+frame = cv2.imread("../assets/inputs/imagemAtual1.jpeg")
 
 # Fazer a predição
 predictions = predict_image(frame)
