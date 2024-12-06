@@ -1,13 +1,18 @@
-from ultralytics import YOLO
 import cv2
+import numpy as np
+import time
+import serial
+from ultralytics import YOLO
 import plotarVagas
-import arduinoConective
 
 # Parâmetros globais
 THRESHHOLD_DETECTION = 0.5
 CLASS_NAME = "Carro"
 MODEL_PATH = "../../assets/models/yolov8s.pt"
 WIDTH_RESIZE = 700
+
+arduino = serial.Serial('/dev/ttyUSB0', 9600, timeout=1)  # Substitua 'COM9' pela porta correta do seu Arduino
+time.sleep(2) 
 
 # Carregando o modelo YOLO
 def load_model():
@@ -38,13 +43,38 @@ def resize_image(img_array, new_width=WIDTH_RESIZE):
     resized_image = cv2.resize(img_array, (new_width, new_height))
     return resized_image
 
+# Função para enviar os valores das vagas para o Arduino
+def toSendValuesVaga(coordinate_vagas, car_coordinates, old_states):
+    global arduino
+    new_states = []
+
+    for i, space in enumerate(coordinate_vagas):
+        vaga_id = space[0]
+        space_rect = space[1:]
+        
+        is_occupied = any(plotarVagas.is_car_in_parking_space(car_rect, space_rect) for car_rect in car_coordinates)
+        new_states.append(is_occupied)
+
+        # Verifica se o estado da vaga mudou
+        if old_states[i] != is_occupied:
+            valor_para_enviar = i + 1  # Se a vaga está ocupada, enviar o número da vaga (1, 2, 3, 4, etc.)
+            if is_occupied:
+                print(f'Enviando {valor_para_enviar} para o Arduino (vaga {vaga_id} ocupada)')
+            else:
+                print(f'Enviando {-valor_para_enviar} para o Arduino (vaga {vaga_id} livre)')
+            
+            arduino.write(f'{valor_para_enviar if is_occupied else -valor_para_enviar}\n'.encode())
+
+    return new_states
+
 # Função principal para analisar as predições e as vagas
 def predictions_analyze_camera():
+    global arduino
     # Carregar o modelo
     model = load_model()
 
     # Inicializar a captura da câmera (apenas uma vez no início)
-    camera = cv2.VideoCapture(2)
+    camera = cv2.VideoCapture(0)
     
     # Verificar se a câmera foi aberta corretamente
     if not camera.isOpened():
@@ -58,6 +88,10 @@ def predictions_analyze_camera():
     
     is_running = True
 
+    # Inicializar os estados antigos das vagas
+    coordinate_vagas = plotarVagas.coordinate_vagas()
+    old_states = [False] * len(coordinate_vagas)
+    
     while is_running:
         # Capturar frame da câmera
         status, frame = camera.read()
@@ -89,8 +123,8 @@ def predictions_analyze_camera():
         # Atualizando a imagem com as vagas e carros detectados
         frame_with_vagas = plotarVagas.plot_vagas(frame_ploted, coordinate_vagas, car_coordinates)
 
-        # Enviando as coordenadas das vagas para o Arduino
-        arduinoConective.toSendValuesVaga(coordinate_vagas, car_coordinates)
+        # Enviando as coordenadas das vagas para o Arduino e atualizando os estados antigos
+        old_states = toSendValuesVaga(coordinate_vagas, car_coordinates, old_states)
 
         # Redimensionando a imagem para 700 pixels de largura
         frame_resized = resize_image(frame_with_vagas, WIDTH_RESIZE)
@@ -101,6 +135,8 @@ def predictions_analyze_camera():
         # Condição de parada
         if cv2.waitKey(1) & 0xff == ord('q'):
             is_running = False
+            
+        time.sleep(1)
 
     # Libera a câmera e fecha todas as janelas
     camera.release()
@@ -109,3 +145,4 @@ def predictions_analyze_camera():
 # Executar a função principal
 if __name__ == "__main__":
     predictions_analyze_camera()
+3

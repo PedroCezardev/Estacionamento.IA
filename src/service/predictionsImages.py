@@ -1,7 +1,9 @@
 from ultralytics import YOLO
 import cv2
+import numpy as np
+import time
+import serial
 import plotarVagas
-import arduinoConective
 
 # Parâmetros globais
 THRESHHOLD_DETECTION = 0.5
@@ -9,6 +11,9 @@ CLASS_NAME = "Carro"
 MODEL_PATH = "../../assets/models/yolov8s.pt"
 IMAGE_PATH = "../../assets/inputs/imagemAtual6.jpeg"
 WIDTH_RESIZE = 700
+
+arduino = serial.Serial('/dev/ttyUSB0', 9600, timeout=1)  # Substitua 'COM9' pela porta correta do seu Arduino
+time.sleep(2) 
 
 # Carregando o modelo YOLO
 def load_model():
@@ -39,6 +44,30 @@ def resize_image(img_array, new_width=WIDTH_RESIZE):
     resized_image = cv2.resize(img_array, (new_width, new_height))
     return resized_image
 
+# Função para enviar os valores das vagas para o Arduino
+def toSendValuesVaga(coordinate_vagas, car_coordinates, old_states):
+    global arduino
+    new_states = []
+
+    for i, space in enumerate(coordinate_vagas):
+        vaga_id = space[0]
+        space_rect = space[1:]
+        
+        is_occupied = any(plotarVagas.is_car_in_parking_space(car_rect, space_rect) for car_rect in car_coordinates)
+        new_states.append(is_occupied)
+
+        # Verifica se o estado da vaga mudou
+        if old_states[i] != is_occupied:
+            valor_para_enviar = i + 1  # Se a vaga está ocupada, enviar o número da vaga (1, 2, 3, 4, etc.)
+            if is_occupied:
+                print(f'Enviando {valor_para_enviar} para o Arduino (vaga {vaga_id} ocupada)')
+            else:
+                print(f'Enviando {-valor_para_enviar} para o Arduino (vaga {vaga_id} livre)')
+            
+            arduino.write(f'{valor_para_enviar if is_occupied else -valor_para_enviar}\n'.encode())
+
+    return new_states
+
 # Função principal para analisar as predições e as vagas
 def predictions_analyze():
     # Carregar o modelo
@@ -61,9 +90,13 @@ def predictions_analyze():
 
     # Atualizando a imagem com as vagas e carros detectados
     frame_with_vagas = plotarVagas.plot_vagas(frame_ploted, coordinate_vagas, car_coordinates)
+    
+    # Inicializar os estados antigos das vagas
+    coordinate_vagas = plotarVagas.coordinate_vagas()
+    old_states = [False] * len(coordinate_vagas)
 
     # Enviando as coordenadas das vagas para o Arduino
-    arduinoConective.toSendValuesVaga(coordinate_vagas, car_coordinates)
+    old_states = toSendValuesVaga(coordinate_vagas, car_coordinates, old_states)
 
     # Redimensionando a imagem para 700 pixels de largura
     frame_resized = resize_image(frame_with_vagas, WIDTH_RESIZE)

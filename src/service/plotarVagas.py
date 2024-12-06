@@ -46,10 +46,10 @@ def is_car_in_parking_space(car_rect, space_rect):
 
 def coordinate_vagas():
     vagasCoordinates = [
-        ("vaga1", 119, 907, 332, 491),
-        ("vaga2", 461, 907, 341, 475),
-        # ("vaga5", 806, 907, 311, 470),
-        ("vaga3", 1136, 142, 300, 448),
-        ("vaga4", 806, 140, 316, 448)
+        ("vaga1", 91, 850, 338, 461),
+        ("vaga2", 427, 839, 324, 461),
+        ("vaga3", 763, 836, 269, 452),
+        ("vaga4", 765, 109, 274, 404),
+        ("vaga5", 1067, 100, 256, 395),
     ]
     return vagasCoordinates
